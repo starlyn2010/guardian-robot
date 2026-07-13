@@ -27,10 +27,8 @@ jobs:
       - name: Download TFLite detection model
         run: |
           mkdir -p app/src/main/assets
-          if [ ! -f app/src/main/assets/efficientdet_lite0.tflite ]; then
-            curl -L -o app/src/main/assets/efficientdet_lite0.tflite \
-              https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float32/1/efficientdet_lite0.tflite
-          fi
+          curl -L -o app/src/main/assets/efficientdet_lite0.tflite \
+            "https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/rpi/lite-model_efficientdet_lite0_detection_metadata_1.tflite"
           echo "=== Assets verificados ==="
           ls -la app/src/main/assets/
           md5sum app/src/main/assets/efficientdet_lite0.tflite
