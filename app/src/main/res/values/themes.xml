@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.GuardianRobot" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">#FF0D1117</item>
+        <item name="android:navigationBarColor">#FF0D1117</item>
+        <item name="android:windowBackground">#FF0D1117</item>
+        <item name="colorPrimary">#FF238636</item>
+        <item name="colorPrimaryVariant">#FF2EA043</item>
+        <item name="colorSecondary">#FF58A6FF</item>
+        <item name="colorOnPrimary">#FFFFFFFF</item>
+        <item name="colorOnSecondary">#FFFFFFFF</item>
+    </style>
+</resources>

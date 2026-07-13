@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Guardián Robot</string>
+    <string name="btn_start">INICIAR</string>
+    <string name="btn_stop">DETENER</string>
+    <string name="zone_green">DESPEJADO</string>
+    <string name="zone_yellow">PRECAUCIÓN</string>
+    <string name="zone_red">INTRUSO</string>
+    <string name="bt_connected">BT: Conectado a %s</string>
+    <string name="bt_disconnected">BT: Desconectado</string>
+    <string name="model_loading">Cargando...</string>
+    <string name="model_ready">Listo</string>
+    <string name="model_error">Error</string>
+    <string name="history_title">HISTORIAL</string>
+    <string name="no_intrusions">Sin intrusiones</string>
+</resources>

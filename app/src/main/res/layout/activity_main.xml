@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF0D1117">
+
+    <!-- Camera Preview -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/zoneIndicator"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/sidePanel" />
+
+    <!-- Detection Overlay -->
+    <com.guardian.robot.DetectionOverlayView
+        android:id="@+id/detectionOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="@id/previewView"
+        app:layout_constraintBottom_toBottomOf="@id/previewView"
+        app:layout_constraintStart_toStartOf="@id/previewView"
+        app:layout_constraintEnd_toEndOf="@id/previewView" />
+
+    <!-- Side Panel -->
+    <LinearLayout
+        android:id="@+id/sidePanel"
+        android:layout_width="280dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:background="#E6161B22"
+        android:padding="12dp"
+        android:elevation="8dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/zoneIndicator"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Status Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="8dp">
+
+            <View
+                android:id="@+id/btIndicator"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:background="@drawable/circle_indicator"
+                android:backgroundTint="#FF4444"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/tvBtStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="BT: Desconectado"
+                android:textColor="#FF8B949E"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- FPS Counter -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FPS: "
+                android:textColor="#FF8B949E"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvFps"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FF58A6FF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Modelo: "
+                android:textColor="#FF8B949E"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvModelStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Cargando"
+                android:textColor="#FF3FB950"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#33FFFFFF"
+            android:layout_marginVertical="8dp" />
+
+        <!-- Intrusion Log Title -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="HISTORIAL"
+            android:textColor="#FF8B949E"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:paddingBottom="6dp" />
+
+        <!-- Intrusion Log RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvIntrusionLog"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingBottom="8dp" />
+
+        <!-- Model Loading Indicator -->
+        <ProgressBar
+            android:id="@+id/progressModel"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:indeterminate="true"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Zone Indicator Bar -->
+    <LinearLayout
+        android:id="@+id/zoneIndicator"
+        android:layout_width="0dp"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:background="#CC161B22"
+        android:elevation="6dp"
+        app:layout_constraintBottom_toTopOf="@id/controls"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <View
+            android:id="@+id/zoneColorBar"
+            android:layout_width="6dp"
+            android:layout_height="match_parent"
+            android:background="#4CAF50" />
+
+        <TextView
+            android:id="@+id/tvZoneText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="INICIANDO..."
+            android:textColor="#FFFFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:paddingHorizontal="16dp" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/tvDetection"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#FF3FB950"
+            android:textSize="14sp"
+            android:paddingEnd="16dp" />
+    </LinearLayout>
+
+    <!-- Bottom Controls -->
+    <LinearLayout
+        android:id="@+id/controls"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:background="#E6161B22"
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="10dp"
+        android:elevation="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/btnStart"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:text="INICIAR"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:backgroundTint="#238636"
+            android:textColor="#FFFFFFFF"
+            android:letterSpacing="0.05" />
+
+        <Button
+            android:id="@+id/btnStop"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="DETENER"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:backgroundTint="#DA3633"
+            android:textColor="#FFFFFFFF"
+            android:visibility="gone"
+            android:letterSpacing="0.05" />
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
