@@ -116,7 +116,7 @@ class MainActivity : AppCompatActivity() {
                     btDeviceName = msg.data.getString(DEVICE_NAME)
                 }
                 MESSAGE_TOAST -> {
-                    updateStatus(msg.data.getString(BluetoothChatService.Companion.TOAST) ?: "Error BT")
+                    updateStatus(msg.data.getString(BluetoothChatService.Companion.TOAST) ?: "E004: Error BT")
                     updateBtIndicator(false, null)
                 }
             }
@@ -133,7 +133,12 @@ class MainActivity : AppCompatActivity() {
         binding.btnStop.setOnClickListener { onStopClick() }
 
         tts = TextToSpeech(this) { status ->
-            if (status == TextToSpeech.SUCCESS) tts?.language = Locale.getDefault()
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale.getDefault()
+            } else {
+                Log.e(TAG, "E010: TTS init failed, status=$status")
+                updateStatus("E010: Voz no disponible")
+            }
         }
 
         binding.progressModel.visibility = View.VISIBLE
@@ -165,13 +170,21 @@ class MainActivity : AppCompatActivity() {
                 binding.tvModelStatus.setTextColor(ContextCompat.getColor(this, R.color.zone_green))
                 updateStatus("Modelo cargado. Presiona INICIAR.")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error cargando modelo", e)
+        } catch (e: java.io.FileNotFoundException) {
+            Log.e(TAG, "E008: Modelo TFLite no encontrado en assets", e)
             mainHandler.post {
                 binding.progressModel.visibility = View.GONE
-                binding.tvModelStatus.text = "Error"
+                binding.tvModelStatus.text = "E008"
                 binding.tvModelStatus.setTextColor(ContextCompat.getColor(this, R.color.zone_red))
-                updateStatus("Error modelo: ${e.message}")
+                updateStatus("E008: Modelo efficientdet_lite0.tflite no encontrado")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "E009: Error cargando modelo TFLite", e)
+            mainHandler.post {
+                binding.progressModel.visibility = View.GONE
+                binding.tvModelStatus.text = "E009"
+                binding.tvModelStatus.setTextColor(ContextCompat.getColor(this, R.color.zone_red))
+                updateStatus("E009: ${e.message}")
             }
         }
     }
@@ -194,22 +207,31 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == PERM_REQ_CODE && grants.all { it == PackageManager.PERMISSION_GRANTED }) {
             connectBluetooth()
         } else {
-            updateStatus("Permisos denegados")
+            val denied = perms.zip(grants.toTypedArray()).filter { it.second != PackageManager.PERMISSION_GRANTED }.map { it.first.substringAfterLast(".") }
+            Log.e(TAG, "E014: Permisos denegados: $denied")
+            updateStatus("E014: Permisos denegados: ${denied.joinToString()}")
         }
     }
 
     private fun connectBluetooth() {
         try {
             val adapter = BluetoothAdapter.getDefaultAdapter()
-            if (adapter == null || !adapter.isEnabled) {
-                updateStatus("Activa Bluetooth en Ajustes")
+            if (adapter == null) {
+                Log.e(TAG, "E001: BluetoothAdapter es null - dispositivo sin BT")
+                updateStatus("E001: Dispositivo sin Bluetooth")
+                mainHandler.post { updateBtIndicator(false, null) }
+                return
+            }
+            if (!adapter.isEnabled) {
+                Log.e(TAG, "E002: Bluetooth desactivado")
+                updateStatus("E002: Activa Bluetooth en Ajustes")
                 mainHandler.post { updateBtIndicator(false, null) }
                 return
             }
             showDevicePicker()
         } catch (e: SecurityException) {
-            Log.e(TAG, "Permiso BT", e)
-            updateStatus("Permiso BT denegado")
+            Log.e(TAG, "E003: Permiso BLUETOOTH_CONNECT denegado", e)
+            updateStatus("E003: Permiso BT denegado")
             mainHandler.post { updateBtIndicator(false, null) }
         }
     }
@@ -233,11 +255,19 @@ class MainActivity : AppCompatActivity() {
                 val addr = pendingDeviceAddr[which]
                 if (addr == "__SCAN__") {
                     startDiscovery()
+                } else if (addr == "__NONE__") {
+                    Log.w(TAG, "E015: No se seleccionó ningún dispositivo")
+                    updateStatus("E015: No se encontraron dispositivos")
                 } else {
-                    val dev = adapter.getRemoteDevice(addr)
-                    btService = BluetoothChatService(btHandler)
-                    btService?.connect(dev)
-                    updateStatus("Conectando a ${dev.name}...")
+                    try {
+                        val dev = adapter.getRemoteDevice(addr)
+                        btService = BluetoothChatService(btHandler)
+                        btService?.connect(dev)
+                        updateStatus("Conectando a ${dev.name ?: addr}...")
+                    } catch (e: IllegalArgumentException) {
+                        Log.e(TAG, "E015: Dirección MAC inválida: $addr", e)
+                        updateStatus("E015: Dispositivo no válido")
+                    }
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -245,7 +275,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startDiscovery() {
-        if (isScanning) return
+        if (isScanning) {
+            Log.w(TAG, "E016: Discovery ya en curso")
+            return
+        }
         val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
         isScanning = true
         discoveredDevices.clear()
@@ -263,11 +296,14 @@ class MainActivity : AppCompatActivity() {
                 } else if (intent.action == BluetoothAdapter.ACTION_DISCOVERY_FINISHED) {
                     isScanning = false
                     if (discoveredDevices.isEmpty()) {
+                        Log.w(TAG, "E015: Discovery finalizado sin dispositivos")
                         pendingDeviceList.add("(no se encontraron dispositivos)")
                         pendingDeviceAddr.add("__NONE__")
                         (devicePickerDialog?.listView?.adapter as? ArrayAdapter<String>)?.notifyDataSetChanged()
                     }
-                    try { unregisterReceiver(discoveryReceiver) } catch (_: Exception) {}
+                    try { unregisterReceiver(discoveryReceiver) } catch (_: Exception) {
+                        Log.w(TAG, "E016: Error unregistering discovery receiver")
+                    }
                 }
             }
         }
@@ -276,7 +312,14 @@ class MainActivity : AppCompatActivity() {
             addAction(BluetoothDevice.ACTION_FOUND)
             addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
         }
-        registerReceiver(discoveryReceiver, filter)
+        try {
+            registerReceiver(discoveryReceiver, filter)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "E003: Permiso BLUETOOTH_SCAN denegado para discovery", e)
+            updateStatus("E003: Permiso BT denegado")
+            isScanning = false
+            return
+        }
         adapter.startDiscovery()
         updateStatus("Escaneando dispositivos...")
     }
@@ -296,32 +339,37 @@ class MainActivity : AppCompatActivity() {
         try {
             val provider = ProcessCameraProvider.getInstance(this)
             provider.addListener({
-                val cameraProvider = provider.get()
-                val preview = Preview.Builder()
-                    .build()
-                    .also { it.setSurfaceProvider(binding.previewView.surfaceProvider) }
+                try {
+                    val cameraProvider = provider.get()
+                    val preview = Preview.Builder()
+                        .build()
+                        .also { it.setSurfaceProvider(binding.previewView.surfaceProvider) }
 
-                val analyzer = ImageAnalysis.Builder()
-                    .setTargetResolution(Size(FRAME_W, FRAME_H))
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-                    .also { it.setAnalyzer(cameraExecutor, ::analyzeFrame) }
+                    val analyzer = ImageAnalysis.Builder()
+                        .setTargetResolution(Size(FRAME_W, FRAME_H))
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                        .also { it.setAnalyzer(cameraExecutor, ::analyzeFrame) }
 
-                val selector = CameraSelector.DEFAULT_BACK_CAMERA
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(this, selector, preview, analyzer)
-                cameraActive = true
+                    val selector = CameraSelector.DEFAULT_BACK_CAMERA
+                    cameraProvider.unbindAll()
+                    cameraProvider.bindToLifecycle(this, selector, preview, analyzer)
+                    cameraActive = true
 
-                binding.btnStart.visibility = View.GONE
-                binding.btnStop.visibility = View.VISIBLE
-                updateStatus("GUARDIÁN ACTIVO")
-                setZoneIndicator(DetectionOverlayView.ZONE_GREEN)
-                speak("Guardián activado")
-                sendBT(3)
+                    binding.btnStart.visibility = View.GONE
+                    binding.btnStop.visibility = View.VISIBLE
+                    updateStatus("GUARDIÁN ACTIVO")
+                    setZoneIndicator(DetectionOverlayView.ZONE_GREEN)
+                    speak("Guardián activado")
+                    sendBT(3)
+                } catch (e: Exception) {
+                    Log.e(TAG, "E007: Error al bindear cámara al lifecycle", e)
+                    updateStatus("E007: Cámara no disponible")
+                }
             }, ContextCompat.getMainExecutor(this))
         } catch (e: Exception) {
-            Log.e(TAG, "Error cámara", e)
-            updateStatus("Error cámara: ${e.message}")
+            Log.e(TAG, "E006: ProcessCameraProvider.getInstance falló", e)
+            updateStatus("E006: Cámara no encontrada")
         }
     }
 
@@ -334,7 +382,14 @@ class MainActivity : AppCompatActivity() {
 
         updateFps()
 
-        val bitmap = imageProxyToBitmap(imageProxy)
+        val bitmap = try {
+            imageProxyToBitmap(imageProxy)
+        } catch (e: Exception) {
+            Log.e(TAG, "E013: Error convirtiendo ImageProxy a Bitmap", e)
+            imageProxy.close()
+            isProcessing = false
+            return
+        }
         imageProxy.close()
 
         inferenceExecutor.execute {
@@ -399,7 +454,8 @@ class MainActivity : AppCompatActivity() {
                 updateDetection("$topClass $confPct% | $sizeText → $zoneName ($cmd)")
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error inferencia", e)
+                Log.e(TAG, "E012: Error durante inferencia TFLite", e)
+                mainHandler.post { updateDetection("E012: Error inferencia") }
             } finally {
                 bitmap.recycle()
                 isProcessing = false
@@ -476,7 +532,7 @@ class MainActivity : AppCompatActivity() {
         val out = ByteArrayOutputStream()
         yuv.compressToJpeg(Rect(0, 0, img.width, img.height), 90, out)
         val jpg = out.toByteArray()
-        return BitmapFactory.decodeByteArray(jpg, 0, jpg.size)
+        return BitmapFactory.decodeByteArray(jpg, 0, jpg.size) ?: throw IllegalStateException("E013: BitmapFactory.decodeByteArray returned null")
     }
 
     private fun getCocoLabel(id: Int): String = when (id) {
@@ -487,10 +543,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendBT(n: Int) {
+        if (btService == null) {
+            Log.e(TAG, "E011: btService es null, no se puede enviar comando $n")
+            updateStatus("E011: Sin conexión BT para enviar")
+            return
+        }
         btService?.write("$n\n")
     }
 
     private fun speak(text: String) {
+        if (tts == null) {
+            Log.w(TAG, "E010: TTS null, no se puede hablar")
+            return
+        }
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "guardian")
     }
 
@@ -529,11 +594,17 @@ class MainActivity : AppCompatActivity() {
         try {
             val provider = ProcessCameraProvider.getInstance(this)
             provider.addListener({ provider.get().unbindAll() }, ContextCompat.getMainExecutor(this))
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.e(TAG, "E017: Error deteniendo cámara", e)
+        }
     }
 
     private fun closeBT() {
-        btService?.stop()
+        try {
+            btService?.stop()
+        } catch (e: Exception) {
+            Log.e(TAG, "E018: Error deteniendo btService", e)
+        }
         btService = null
         try {
             if (discoveryReceiver != null) {
@@ -541,7 +612,9 @@ class MainActivity : AppCompatActivity() {
                 unregisterReceiver(discoveryReceiver)
                 discoveryReceiver = null
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.e(TAG, "E019: Error cerrando BT receiver", e)
+        }
         isScanning = false
     }
 
