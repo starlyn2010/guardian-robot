@@ -88,7 +88,7 @@ class BluetoothChatService(private val handler: Handler) {
             sendMessageToHandler("E023: Sin conexión BT")
             return
         }
-        thread?.write(cmd)
+        thread.write(cmd)
     }
 
     fun write(msg: String) {
@@ -101,7 +101,7 @@ class BluetoothChatService(private val handler: Handler) {
             sendMessageToHandler("E024: Sin conexión BT")
             return
         }
-        thread?.write(msg)
+        thread.write(msg)
     }
 
     fun connectionFailed() {
@@ -140,9 +140,26 @@ class BluetoothChatService(private val handler: Handler) {
         init {
             try {
                 socket = device.createRfcommSocketToServiceRecord(BT_UUID)
+            } catch (e: SecurityException) {
+                Log.e(TAG, "E003: Permiso BT denegado al crear socket", e)
+                sendMessageToHandler("E003: Permiso BT denegado")
             } catch (e: IOException) {
-                Log.e(TAG, "E020: Error creando socket RFComm", e)
-                sendMessageToHandler("E020: Socket creation failed")
+                Log.e(TAG, "E020: createRfcommSocketToServiceRecord falló", e)
+                tryFallbackSocket()
+            } catch (e: NullPointerException) {
+                Log.e(TAG, "E020: device nulo en createSocket", e)
+                sendMessageToHandler("E020: Dispositivo inválido")
+            }
+        }
+
+        private fun tryFallbackSocket() {
+            try {
+                val method = device.javaClass.getMethod("createRfcommSocket", Int::class.java)
+                socket = method.invoke(device, 1) as BluetoothSocket
+                Log.w(TAG, "E020: Fallback createRfcommSocket(1) exitoso")
+            } catch (e: Exception) {
+                Log.e(TAG, "E020: Ambos métodos de socket fallaron", e)
+                sendMessageToHandler("E020: Socket no creado")
             }
         }
 
@@ -151,10 +168,17 @@ class BluetoothChatService(private val handler: Handler) {
 
             adapter?.cancelDiscovery()
 
+            if (socket == null) {
+                Log.e(TAG, "E020: socket es null antes de connect(), abortando")
+                connectionFailed()
+                return
+            }
+
             try {
                 socket?.connect()
+                Log.i(TAG, "ConnectThread: socket.connect() exitoso")
             } catch (e: IOException) {
-                Log.e(TAG, "E021: connect() falló", e)
+                Log.e(TAG, "E021: connect() falló: ${e.message}", e)
                 try {
                     socket?.close()
                 } catch (e2: IOException) {

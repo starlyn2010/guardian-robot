@@ -241,9 +241,15 @@ class MainActivity : AppCompatActivity() {
         pendingDeviceList.clear()
         pendingDeviceAddr.clear()
 
-        for (d in adapter.bondedDevices) {
-            pendingDeviceList.add("${d.name}\n${d.address} (emparejado)")
-            pendingDeviceAddr.add(d.address)
+        try {
+            for (d in adapter.bondedDevices) {
+                pendingDeviceList.add("${d.name}\n${d.address} (emparejado)")
+                pendingDeviceAddr.add(d.address)
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "E003: Permiso BLUETOOTH_CONNECT denegado para bondedDevices", e)
+            updateStatus("E003: Permiso BT denegado")
+            return
         }
         pendingDeviceList.add("--- ESCANEAR ---")
         pendingDeviceAddr.add("__SCAN__")
