@@ -489,7 +489,6 @@ class MainActivity : AppCompatActivity() {
     private fun sendBT(n: Int) {
         btService?.write("$n\n")
     }
-    }
 
     private fun speak(text: String) {
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "guardian")

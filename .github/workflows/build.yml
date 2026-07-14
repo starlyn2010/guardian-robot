@@ -19,8 +19,12 @@ jobs:
           java-version: 17
           distribution: temurin
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      - name: Install Android SDK
+        run: |
+          echo "y" | $ANDROID_HOME/tools/bin/sdkmanager --install "platforms;android-34" "build-tools;34.0.0" 2>/dev/null || true
+
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.6
 
       - name: Download TFLite model
         run: |
@@ -29,9 +33,7 @@ jobs:
             "https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/rpi/lite-model_efficientdet_lite0_detection_metadata_1.tflite"
 
       - name: Build
-        run: |
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
-          ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
