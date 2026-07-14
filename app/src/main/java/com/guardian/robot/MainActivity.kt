@@ -2,19 +2,27 @@ package com.guardian.robot
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothSocket
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Message
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.util.Size
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -25,13 +33,19 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.guardian.robot.BluetoothChatService.Companion.DEVICE_NAME
+import com.guardian.robot.BluetoothChatService.Companion.MESSAGE_DEVICE_NAME
+import com.guardian.robot.BluetoothChatService.Companion.MESSAGE_STATE_CHANGE
+import com.guardian.robot.BluetoothChatService.Companion.MESSAGE_TOAST
+import com.guardian.robot.BluetoothChatService.Companion.STATE_CONNECTED
+import com.guardian.robot.BluetoothChatService.Companion.STATE_CONNECTING
+import com.guardian.robot.BluetoothChatService.Companion.STATE_NONE
 import com.guardian.robot.databinding.ActivityMainBinding
 import org.tensorflow.lite.task.core.BaseOptions
 import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
 import org.tensorflow.lite.support.image.TensorImage
 import java.io.ByteArrayOutputStream
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.Executors
@@ -44,8 +58,9 @@ class MainActivity : AppCompatActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var detector: ObjectDetector? = null
-    private var btSocket: BluetoothSocket? = null
+    private var btService: BluetoothChatService? = null
     private var tts: TextToSpeech? = null
+    private var btDeviceName: String? = null
 
     private var isProcessing = false
     private var cameraActive = false
@@ -59,6 +74,13 @@ class MainActivity : AppCompatActivity() {
     private var lastFpsTime = System.currentTimeMillis()
     private var currentFps = 0
 
+    private val discoveredDevices = mutableListOf<BluetoothDevice>()
+    private var discoveryReceiver: BroadcastReceiver? = null
+    private var devicePickerDialog: AlertDialog? = null
+    private var pendingDeviceList = mutableListOf<String>()
+    private var pendingDeviceAddr = mutableListOf<String>()
+    private var isScanning = false
+
     companion object {
         private val INTRUDER_CLASSES = setOf(1, 16, 17, 18, 19, 20, 21, 22, 23, 24)
         private const val CONF_THRESHOLD = 0.6f
@@ -67,10 +89,38 @@ class MainActivity : AppCompatActivity() {
         private const val FRAME_W = 640
         private const val FRAME_H = 480
         private const val FRAME_AREA = FRAME_W * FRAME_H
-        private const val BT_UUID = "00001101-0000-1000-8000-00805F9B34FB"
         private const val TAG = "Guardian"
         private const val PERM_REQ_CODE = 100
         private const val MAX_LOG_SIZE = 50
+    }
+
+    private val btHandler = object : Handler(Looper.getMainLooper()) {
+        override fun handleMessage(msg: Message) {
+            when (msg.what) {
+                MESSAGE_STATE_CHANGE -> {
+                    when (msg.arg1) {
+                        STATE_CONNECTED -> {
+                            updateStatus("BT conectado a $btDeviceName. Iniciando cámara...")
+                            updateBtIndicator(true, btDeviceName)
+                            startCamera()
+                        }
+                        STATE_CONNECTING -> updateStatus("Conectando Bluetooth...")
+                        STATE_NONE -> {
+                            updateBtIndicator(false, null)
+                            val toast = msg.data.getString(BluetoothChatService.Companion.TOAST)
+                            if (toast != null) updateStatus(toast)
+                        }
+                    }
+                }
+                MESSAGE_DEVICE_NAME -> {
+                    btDeviceName = msg.data.getString(DEVICE_NAME)
+                }
+                MESSAGE_TOAST -> {
+                    updateStatus(msg.data.getString(BluetoothChatService.Companion.TOAST) ?: "Error BT")
+                    updateBtIndicator(false, null)
+                }
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -133,8 +183,7 @@ class MainActivity : AppCompatActivity() {
             perms.add(Manifest.permission.BLUETOOTH_SCAN)
         }
         if (perms.all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }) {
-            updateStatus("Conectando Bluetooth...")
-            inferenceExecutor.execute { connectBluetooth() }
+            connectBluetooth()
         } else {
             ActivityCompat.requestPermissions(this, perms.toTypedArray(), PERM_REQ_CODE)
         }
@@ -143,8 +192,7 @@ class MainActivity : AppCompatActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, perms: Array<out String>, grants: IntArray) {
         super.onRequestPermissionsResult(requestCode, perms, grants)
         if (requestCode == PERM_REQ_CODE && grants.all { it == PackageManager.PERMISSION_GRANTED }) {
-            updateStatus("Conectando Bluetooth...")
-            inferenceExecutor.execute { connectBluetooth() }
+            connectBluetooth()
         } else {
             updateStatus("Permisos denegados")
         }
@@ -158,30 +206,7 @@ class MainActivity : AppCompatActivity() {
                 mainHandler.post { updateBtIndicator(false, null) }
                 return
             }
-
-            var device = adapter.bondedDevices.firstOrNull { it.name?.contains("HC-05", true) == true }
-            if (device == null) device = adapter.bondedDevices.firstOrNull { it.name?.contains("HC-06", true) == true }
-            if (device == null) device = adapter.bondedDevices.firstOrNull()
-
-            if (device == null) {
-                updateStatus("Empareja el módulo BT en Ajustes primero")
-                mainHandler.post { updateBtIndicator(false, null) }
-                return
-            }
-
-            btSocket = device.createRfcommSocketToServiceRecord(UUID.fromString(BT_UUID))
-            btSocket?.connect()
-
-            val devName = device.name ?: "Desconocido"
-            updateStatus("BT conectado a $devName. Iniciando cámara...")
-            mainHandler.post {
-                updateBtIndicator(true, devName)
-                startCamera()
-            }
-        } catch (e: IOException) {
-            Log.e(TAG, "Error BT", e)
-            updateStatus("Error BT: ${e.message}")
-            mainHandler.post { updateBtIndicator(false, null) }
+            showDevicePicker()
         } catch (e: SecurityException) {
             Log.e(TAG, "Permiso BT", e)
             updateStatus("Permiso BT denegado")
@@ -189,11 +214,82 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showDevicePicker() {
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
+        pendingDeviceList.clear()
+        pendingDeviceAddr.clear()
+
+        for (d in adapter.bondedDevices) {
+            pendingDeviceList.add("${d.name}\n${d.address} (emparejado)")
+            pendingDeviceAddr.add(d.address)
+        }
+        pendingDeviceList.add("--- ESCANEAR ---")
+        pendingDeviceAddr.add("__SCAN__")
+
+        val listAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, pendingDeviceList)
+        devicePickerDialog = AlertDialog.Builder(this)
+            .setTitle("Seleccionar dispositivo")
+            .setAdapter(listAdapter) { _, which ->
+                val addr = pendingDeviceAddr[which]
+                if (addr == "__SCAN__") {
+                    startDiscovery()
+                } else {
+                    val dev = adapter.getRemoteDevice(addr)
+                    btService = BluetoothChatService(btHandler)
+                    btService?.connect(dev)
+                    updateStatus("Conectando a ${dev.name}...")
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun startDiscovery() {
+        if (isScanning) return
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
+        isScanning = true
+        discoveredDevices.clear()
+
+        discoveryReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                if (intent.action == BluetoothDevice.ACTION_FOUND) {
+                    val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    if (device != null && device.name != null && device !in discoveredDevices) {
+                        discoveredDevices.add(device)
+                        pendingDeviceList.add("${device.name}\n${device.address}")
+                        pendingDeviceAddr.add(device.address)
+                        (devicePickerDialog?.listView?.adapter as? ArrayAdapter<String>)?.notifyDataSetChanged()
+                    }
+                } else if (intent.action == BluetoothAdapter.ACTION_DISCOVERY_FINISHED) {
+                    isScanning = false
+                    if (discoveredDevices.isEmpty()) {
+                        pendingDeviceList.add("(no se encontraron dispositivos)")
+                        pendingDeviceAddr.add("__NONE__")
+                        (devicePickerDialog?.listView?.adapter as? ArrayAdapter<String>)?.notifyDataSetChanged()
+                    }
+                    try { unregisterReceiver(discoveryReceiver) } catch (_: Exception) {}
+                }
+            }
+        }
+
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+        }
+        registerReceiver(discoveryReceiver, filter)
+        adapter.startDiscovery()
+        updateStatus("Escaneando dispositivos...")
+    }
+
     private fun updateBtIndicator(connected: Boolean, deviceName: String?) {
         val color = if (connected) ContextCompat.getColor(this, R.color.zone_green)
                     else ContextCompat.getColor(this, R.color.zone_red)
         binding.btIndicator.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
-        binding.tvBtStatus.text = if (connected) "BT: $deviceName" else "BT: Desconectado"
+        binding.tvBtStatus.text = if (connected) "BT: $deviceName" else "Desconectado"
+        binding.tvBtStatus.setTextColor(
+            if (connected) ContextCompat.getColor(this, R.color.zone_green)
+            else ContextCompat.getColor(this, R.color.text_muted)
+        )
     }
 
     private fun startCamera() {
@@ -328,6 +424,7 @@ class MainActivity : AppCompatActivity() {
         mainHandler.post {
             intrusionLog.add(0, event)
             if (intrusionLog.size > MAX_LOG_SIZE) intrusionLog.removeAt(intrusionLog.lastIndex)
+            binding.tvCount.text = intrusionLog.size.toString()
             intrusionAdapter.notifyItemInserted(0)
             binding.rvIntrusionLog.scrollToPosition(0)
         }
@@ -335,19 +432,39 @@ class MainActivity : AppCompatActivity() {
 
     private fun setZoneIndicator(zone: Int) {
         mainHandler.post {
-            val colorRes = when (zone) {
-                DetectionOverlayView.ZONE_RED -> R.color.zone_red
-                DetectionOverlayView.ZONE_YELLOW -> R.color.zone_yellow
-                else -> R.color.zone_green
+            val color = when (zone) {
+                DetectionOverlayView.ZONE_RED -> ContextCompat.getColor(this, R.color.zone_red)
+                DetectionOverlayView.ZONE_YELLOW -> ContextCompat.getColor(this, R.color.zone_yellow)
+                else -> ContextCompat.getColor(this, R.color.zone_green)
             }
-            val color = ContextCompat.getColor(this, colorRes)
+            val dimColor = when (zone) {
+                DetectionOverlayView.ZONE_RED -> ContextCompat.getColor(this, R.color.zone_red_dim)
+                DetectionOverlayView.ZONE_YELLOW -> ContextCompat.getColor(this, R.color.zone_yellow_dim)
+                else -> ContextCompat.getColor(this, R.color.zone_green_dim)
+            }
             val text = when (zone) {
                 DetectionOverlayView.ZONE_RED -> "INTRUSO DETECTADO"
                 DetectionOverlayView.ZONE_YELLOW -> "PRECAUCIÓN"
                 else -> "DESPEJADO"
             }
+            val badgeText = when (zone) {
+                DetectionOverlayView.ZONE_RED -> "ALERTA"
+                DetectionOverlayView.ZONE_YELLOW -> "ATENCIÓN"
+                else -> "DESPEJADO"
+            }
+            val bgRes = when (zone) {
+                DetectionOverlayView.ZONE_RED -> R.color.zone_red_glow
+                DetectionOverlayView.ZONE_YELLOW -> R.color.zone_yellow_glow
+                else -> R.color.zone_green_glow
+            }
             binding.zoneColorBar.setBackgroundColor(color)
+            binding.zoneColorBar.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
+            binding.zoneIcon.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
             binding.tvZoneText.text = text
+            binding.tvZoneText.setTextColor(color)
+            binding.tvZoneBadge.text = badgeText
+            binding.tvZoneBadge.setTextColor(color)
+            binding.tvZoneBadge.backgroundTintList = android.content.res.ColorStateList.valueOf(dimColor)
         }
     }
 
@@ -370,12 +487,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendBT(c: Char) {
-        try {
-            btSocket?.outputStream?.write(c.code)
-            btSocket?.outputStream?.flush()
-        } catch (_: Exception) {
-            updateStatus("Error enviando BT")
-        }
+        btService?.write(c)
     }
 
     private fun speak(text: String) {
@@ -401,8 +513,13 @@ class MainActivity : AppCompatActivity() {
         binding.detectionOverlay.clearDetections()
         updateStatus("DETENIDO")
         updateDetection("")
-        binding.zoneColorBar.setBackgroundColor(Color.GRAY)
+        binding.zoneColorBar.setBackgroundColor(Color.DKGRAY)
+        binding.zoneIcon.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.DKGRAY)
         binding.tvZoneText.text = "DETENIDO"
+        binding.tvZoneText.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+        binding.tvZoneBadge.text = "INACTIVO"
+        binding.tvZoneBadge.setTextColor(ContextCompat.getColor(this, R.color.text_muted))
+        binding.tvZoneBadge.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)
         updateBtIndicator(false, null)
         binding.tvFps.text = "0"
         speak("Guardián desactivado")
@@ -416,8 +533,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun closeBT() {
-        try { btSocket?.close() } catch (_: Exception) {}
-        btSocket = null
+        btService?.stop()
+        btService = null
+        try {
+            if (discoveryReceiver != null) {
+                BluetoothAdapter.getDefaultAdapter()?.cancelDiscovery()
+                unregisterReceiver(discoveryReceiver)
+                discoveryReceiver = null
+            }
+        } catch (_: Exception) {}
+        isScanning = false
     }
 
     override fun onDestroy() {

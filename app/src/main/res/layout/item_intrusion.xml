@@ -2,47 +2,69 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:paddingVertical="6dp"
-    android:paddingHorizontal="4dp">
-
-    <View
-        android:id="@+id/intrusionColorDot"
-        android:layout_width="8dp"
-        android:layout_height="8dp"
-        android:background="@drawable/circle_indicator"
-        android:layout_marginEnd="8dp" />
+    android:orientation="vertical"
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_intrusion_item"
+        android:paddingVertical="8dp"
+        android:paddingStart="0dp"
+        android:paddingEnd="10dp">
 
-        <TextView
-            android:id="@+id/tvIntrusionType"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="persona"
-            android:textColor="#FFC9D1D9"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+        <!-- Color bar -->
+        <View
+            android:id="@+id/intrusionColorBar"
+            android:layout_width="3dp"
+            android:layout_height="match_parent"
+            android:background="#FF1744"
+            android:layout_marginEnd="10dp" />
 
-        <TextView
-            android:id="@+id/tvIntrusionDetail"
-            android:layout_width="match_parent"
+        <!-- Icon -->
+        <View
+            android:id="@+id/intrusionIcon"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/ic_intrusion_person"
+            android:backgroundTint="@color/text_secondary"
+            android:layout_marginEnd="8dp" />
+
+        <!-- Info -->
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="85% | 15%"
-            android:textColor="#FF8B949E"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvIntrusionType"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="persona"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvIntrusionDetail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="85% · 15%"
+                android:textColor="@color/text_muted"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- Time -->
+        <TextView
+            android:id="@+id/tvIntrusionTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="12:34:56"
+            android:textColor="@color/text_muted"
             android:textSize="10sp" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/tvIntrusionTime"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="12:34:56"
-        android:textColor="#FF6E7681"
-        android:textSize="10sp" />
 </LinearLayout>

@@ -1,11 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="zone_green">#FF3FB950</color>
-    <color name="zone_yellow">#FFD29922</color>
-    <color name="zone_red">#FFFF4444</color>
-    <color name="zone_yellow_actual">#FFD29922</color>
-    <color name="bg_dark">#FF0D1117</color>
-    <color name="bg_panel">#E6161B22</color>
-    <color name="text_primary">#FFC9D1D9</color>
-    <color name="text_secondary">#FF8B949E</color>
+    <!-- Zone colors (vibrant, high-chroma) -->
+    <color name="zone_green">#FF00E676</color>
+    <color name="zone_yellow">#FFFFD740</color>
+    <color name="zone_red">#FFFF1744</color>
+    <color name="zone_green_dim">#3300E676</color>
+    <color name="zone_yellow_dim">#33FFD740</color>
+    <color name="zone_red_dim">#33FF1744</color>
+    <color name="zone_green_glow">#5500E676</color>
+    <color name="zone_yellow_glow">#55FFD740</color>
+    <color name="zone_red_glow">#55FF1744</color>
+
+    <!-- Surfaces -->
+    <color name="bg_dark">#FF070B14</color>
+    <color name="bg_surface">#F0141A28</color>
+    <color name="bg_surface_darker">#E60E1320</color>
+    <color name="bg_card">#FF1C2338</color>
+
+    <!-- Accent -->
+    <color name="accent_cyan">#FF00D4FF</color>
+    <color name="accent_cyan_dim">#3300D4FF</color>
+
+    <!-- Text -->
+    <color name="text_primary">#FFEEF2FF</color>
+    <color name="text_secondary">#FF8899BB</color>
+    <color name="text_muted">#FF556688</color>
+    <color name="text_on_accent">#FF070B14</color>
 </resources>

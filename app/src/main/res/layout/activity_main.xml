@@ -5,9 +5,9 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF0D1117">
+    android:background="@color/bg_dark">
 
-    <!-- Camera Preview -->
+    <!-- Full-bleed Camera Preview -->
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="0dp"
@@ -30,12 +30,14 @@
     <!-- Side Panel -->
     <LinearLayout
         android:id="@+id/sidePanel"
-        android:layout_width="280dp"
+        android:layout_width="260dp"
         android:layout_height="0dp"
         android:orientation="vertical"
-        android:background="#E6161B22"
-        android:padding="12dp"
-        android:elevation="8dp"
+        android:background="@drawable/bg_side_panel"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="8dp"
+        android:elevation="12dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toTopOf="@id/zoneIndicator"
         app:layout_constraintEnd_toEndOf="parent">
@@ -46,12 +48,12 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingBottom="8dp">
+            android:paddingBottom="10dp">
 
             <View
                 android:id="@+id/btIndicator"
-                android:layout_width="12dp"
-                android:layout_height="12dp"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
                 android:background="@drawable/circle_indicator"
                 android:backgroundTint="#FF4444"
                 android:layout_marginEnd="8dp" />
@@ -61,34 +63,44 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="BT: Desconectado"
-                android:textColor="#FF8B949E"
-                android:textSize="13sp" />
+                android:text="Desconectado"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- FPS Counter -->
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/accent_cyan_dim"
+            android:layout_marginBottom="10dp" />
+
+        <!-- Performance Row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingBottom="4dp">
+            android:paddingBottom="8dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="FPS: "
-                android:textColor="#FF8B949E"
-                android:textSize="13sp" />
+                android:text="FPS"
+                android:textColor="@color/text_muted"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12" />
 
             <TextView
                 android:id="@+id/tvFps"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#FF58A6FF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+                android:textColor="@color/accent_cyan"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginStart="6dp" />
 
             <View
                 android:layout_width="0dp"
@@ -98,52 +110,79 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Modelo: "
-                android:textColor="#FF8B949E"
-                android:textSize="13sp" />
+                android:text="MODELO"
+                android:textColor="@color/text_muted"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12" />
 
             <TextView
                 android:id="@+id/tvModelStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Cargando"
-                android:textColor="#FF3FB950"
-                android:textSize="13sp" />
+                android:textColor="@color/zone_green"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:layout_marginStart="6dp" />
         </LinearLayout>
 
+        <!-- Divider -->
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#33FFFFFF"
-            android:layout_marginVertical="8dp" />
+            android:background="#15FFFFFF"
+            android:layout_marginVertical="6dp" />
 
-        <!-- Intrusion Log Title -->
-        <TextView
+        <!-- Historial label -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="HISTORIAL"
-            android:textColor="#FF8B949E"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.1"
-            android:paddingBottom="6dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="8dp">
 
-        <!-- Intrusion Log RecyclerView -->
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="HISTORIAL"
+                android:textColor="@color/text_muted"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.15" />
+
+            <TextView
+                android:id="@+id/tvCount"
+                android:layout_width="wrap_content"
+                android:layout_height="18dp"
+                android:text="0"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp"
+                android:gravity="center"
+                android:paddingHorizontal="6dp"
+                android:background="@drawable/circle_indicator"
+                android:backgroundTint="#15FFFFFF" />
+        </LinearLayout>
+
+        <!-- Intrusion Log -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvIntrusionLog"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:clipToPadding="false"
-            android:paddingBottom="8dp" />
+            android:paddingBottom="4dp"
+            android:overScrollMode="never" />
 
-        <!-- Model Loading Indicator -->
+        <!-- Model Loading -->
         <ProgressBar
             android:id="@+id/progressModel"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="4dp"
+            android:layout_height="3dp"
             android:indeterminate="true"
+            android:progressTint="@color/accent_cyan"
             android:visibility="gone" />
     </LinearLayout>
 
@@ -151,56 +190,92 @@
     <LinearLayout
         android:id="@+id/zoneIndicator"
         android:layout_width="0dp"
-        android:layout_height="52dp"
+        android:layout_height="56dp"
         android:orientation="horizontal"
-        android:gravity="center"
-        android:background="#CC161B22"
-        android:elevation="6dp"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_zone_bar"
+        android:elevation="8dp"
         app:layout_constraintBottom_toTopOf="@id/controls"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
+        <!-- Zone Color Block -->
         <View
             android:id="@+id/zoneColorBar"
-            android:layout_width="6dp"
-            android:layout_height="match_parent"
-            android:background="#4CAF50" />
+            android:layout_width="4dp"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_zone_green"
+            android:layout_marginStart="16dp" />
 
-        <TextView
-            android:id="@+id/tvZoneText"
+        <!-- Zone Icon -->
+        <View
+            android:id="@+id/zoneIcon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="14dp"
+            android:background="@drawable/ic_zone_shield"
+            android:backgroundTint="@color/zone_green" />
+
+        <!-- Zone Text -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="INICIANDO..."
-            android:textColor="#FFFFFFFF"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:paddingHorizontal="16dp" />
+            android:orientation="vertical"
+            android:layout_marginStart="10dp">
+
+            <TextView
+                android:id="@+id/tvZoneText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SISTEMA INACTIVO"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.04" />
+
+            <TextView
+                android:id="@+id/tvDetection"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Esperando inicio..."
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
 
         <View
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_weight="1" />
 
+        <!-- Zone Status Badge -->
         <TextView
-            android:id="@+id/tvDetection"
+            android:id="@+id/tvZoneBadge"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text=""
-            android:textColor="#FF3FB950"
-            android:textSize="14sp"
-            android:paddingEnd="16dp" />
+            android:layout_height="24dp"
+            android:text="DESPEJADO"
+            android:textColor="@color/zone_green"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:background="#3300E676"
+            android:backgroundTint="@color/zone_green_dim"
+            android:layout_marginEnd="16dp" />
     </LinearLayout>
 
     <!-- Bottom Controls -->
     <LinearLayout
         android:id="@+id/controls"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="60dp"
         android:orientation="horizontal"
         android:gravity="center"
-        android:background="#E6161B22"
-        android:paddingHorizontal="20dp"
-        android:paddingVertical="10dp"
+        android:background="@color/bg_surface_darker"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="8dp"
         android:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -209,29 +284,29 @@
         <Button
             android:id="@+id/btnStart"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="44dp"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:text="INICIAR"
-            android:textSize="15sp"
+            android:text="INICIAR GUARDIÁN"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:backgroundTint="#238636"
-            android:textColor="#FFFFFFFF"
-            android:letterSpacing="0.05" />
+            android:textColor="@color/text_on_accent"
+            android:letterSpacing="0.08"
+            android:background="@drawable/bg_button_start" />
 
         <Button
             android:id="@+id/btnStop"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="44dp"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
             android:text="DETENER"
-            android:textSize="15sp"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:backgroundTint="#DA3633"
-            android:textColor="#FFFFFFFF"
-            android:visibility="gone"
-            android:letterSpacing="0.05" />
+            android:textColor="#FFFF1744"
+            android:letterSpacing="0.08"
+            android:background="@drawable/bg_button_stop"
+            android:visibility="gone" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
