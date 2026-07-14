@@ -566,7 +566,7 @@ class MainActivity : AppCompatActivity() {
     ) : RecyclerView.Adapter<IntrusionAdapter.ViewHolder>() {
 
         inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-            val colorDot: View = view.findViewById(R.id.intrusionColorDot)
+            val colorBar: View = view.findViewById(R.id.intrusionColorBar)
             val tvType: TextView = view.findViewById(R.id.tvIntrusionType)
             val tvDetail: TextView = view.findViewById(R.id.tvIntrusionDetail)
             val tvTime: TextView = view.findViewById(R.id.tvIntrusionTime)
@@ -585,7 +585,7 @@ class MainActivity : AppCompatActivity() {
                 event.type == "perro" || event.type == "oso" -> ContextCompat.getColor(holder.itemView.context, R.color.zone_yellow)
                 else -> ContextCompat.getColor(holder.itemView.context, R.color.zone_green)
             }
-            holder.colorDot.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
+            holder.colorBar.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
             holder.tvType.text = event.type
             holder.tvDetail.text = "${(event.confidence * 100).toInt()}% | ${(event.sizeRatio * 100).toInt()}%"
             holder.tvTime.text = event.time
