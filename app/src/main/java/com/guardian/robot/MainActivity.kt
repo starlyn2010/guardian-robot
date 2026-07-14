@@ -64,7 +64,7 @@ class MainActivity : AppCompatActivity() {
 
     private var isProcessing = false
     private var cameraActive = false
-    private var lastSent = 'G'
+    private var lastSent = 3
     private var lastZone = DetectionOverlayView.ZONE_GREEN
 
     private val intrusionLog = mutableListOf<IntrusionEvent>()
@@ -317,7 +317,7 @@ class MainActivity : AppCompatActivity() {
                 updateStatus("GUARDIÁN ACTIVO")
                 setZoneIndicator(DetectionOverlayView.ZONE_GREEN)
                 speak("Guardián activado")
-                sendBT('G')
+                sendBT(3)
             }, ContextCompat.getMainExecutor(this))
         } catch (e: Exception) {
             Log.e(TAG, "Error cámara", e)
@@ -370,9 +370,9 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 val cmd = when (zone) {
-                    DetectionOverlayView.ZONE_RED -> 'P'
-                    DetectionOverlayView.ZONE_YELLOW -> 'Y'
-                    else -> 'G'
+                    DetectionOverlayView.ZONE_RED -> 1    // Peligro
+                    DetectionOverlayView.ZONE_YELLOW -> 2  // Precaución
+                    else -> 3                              // Seguro
                 }
 
                 mainHandler.post {
@@ -486,8 +486,9 @@ class MainActivity : AppCompatActivity() {
         else -> "obj_$id"
     }
 
-    private fun sendBT(c: Char) {
-        btService?.write(c)
+    private fun sendBT(n: Int) {
+        btService?.write("$n\n")
+    }
     }
 
     private fun speak(text: String) {
@@ -506,7 +507,7 @@ class MainActivity : AppCompatActivity() {
         stopCamera()
         closeBT()
         cameraActive = false
-        lastSent = 'G'
+        lastSent = 3
         lastZone = DetectionOverlayView.ZONE_GREEN
         binding.btnStart.visibility = View.VISIBLE
         binding.btnStop.visibility = View.GONE

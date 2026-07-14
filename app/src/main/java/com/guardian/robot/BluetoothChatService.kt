@@ -86,6 +86,14 @@ class BluetoothChatService(private val handler: Handler) {
         thread?.write(cmd)
     }
 
+    fun write(msg: String) {
+        val thread: ConnectedThread?
+        synchronized(this) {
+            thread = connectedThread
+        }
+        thread?.write(msg)
+    }
+
     fun connectionFailed() {
         val msg = handler.obtainMessage(MESSAGE_TOAST)
         val bundle = android.os.Bundle()
@@ -188,6 +196,15 @@ class BluetoothChatService(private val handler: Handler) {
         fun write(cmd: Char) {
             try {
                 outputStream?.write(cmd.code)
+                outputStream?.flush()
+            } catch (e: IOException) {
+                Log.e(TAG, "Exception during write", e)
+            }
+        }
+
+        fun write(msg: String) {
+            try {
+                outputStream?.write(msg.toByteArray())
                 outputStream?.flush()
             } catch (e: IOException) {
                 Log.e(TAG, "Exception during write", e)
