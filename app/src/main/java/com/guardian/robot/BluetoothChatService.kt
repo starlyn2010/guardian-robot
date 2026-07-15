@@ -180,8 +180,8 @@ class BluetoothChatService(private val handler: Handler) {
                 } catch (_: InterruptedException) {
                     return@Thread
                 }
-                synchronized(this@ConnectThread) {
-                    if (getState() == STATE_CONNECTING) {
+            synchronized(this@ConnectThread) {
+                if (this@BluetoothChatService.getState() == STATE_CONNECTING) {
                         Log.e(TAG, "E030: Timeout de conexión (${CONNECT_TIMEOUT_MS}ms)")
                         try {
                             socket?.close()
@@ -200,6 +200,7 @@ class BluetoothChatService(private val handler: Handler) {
                 if (elapsed >= CONNECT_TIMEOUT_MS) {
                     Log.e(TAG, "E030: Timeout de conexión tras ${elapsed}ms", e)
                     sendMessageToHandler("E030: Tiempo agotado (${CONNECT_TIMEOUT_MS / 1000}s)")
+                    state = STATE_NONE
                 } else {
                     Log.e(TAG, "E021: connect() falló a los ${elapsed}ms", e)
                     connectionFailed()
