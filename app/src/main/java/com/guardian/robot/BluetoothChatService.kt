@@ -99,13 +99,15 @@ class BluetoothChatService(private val handler: Handler) {
             return
         }
 
-        val msg = handler.obtainMessage(MESSAGE_DEVICE_NAME)
-        val bundle = android.os.Bundle()
-        bundle.putString(DEVICE_NAME, device.name)
-        msg.data = bundle
-        handler.sendMessage(msg)
+    handler.obtainMessage(MESSAGE_STATE_CHANGE, STATE_CONNECTED, -1).sendToTarget()
 
-        state = STATE_CONNECTED
+    val msg = handler.obtainMessage(MESSAGE_DEVICE_NAME)
+    val bundle = android.os.Bundle()
+    bundle.putString(DEVICE_NAME, device.name)
+    msg.data = bundle
+    handler.sendMessage(msg)
+
+    state = STATE_CONNECTED
     }
 
     fun stop() {
