@@ -35,6 +35,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.guardian.robot.BluetoothChatService.Companion.DEVICE_NAME
 import com.guardian.robot.BluetoothChatService.Companion.MESSAGE_DEVICE_NAME
+import com.guardian.robot.BluetoothChatService.Companion.MESSAGE_RETRY
 import com.guardian.robot.BluetoothChatService.Companion.MESSAGE_STATE_CHANGE
 import com.guardian.robot.BluetoothChatService.Companion.MESSAGE_TOAST
 import com.guardian.robot.BluetoothChatService.Companion.STATE_CONNECTED
@@ -104,7 +105,10 @@ class MainActivity : AppCompatActivity() {
                             updateBtIndicator(true, btDeviceName)
                             startCamera()
                         }
-                        STATE_CONNECTING -> updateStatus("Conectando Bluetooth...")
+                        STATE_CONNECTING -> {
+                            val connectMsg = msg.data.getString(BluetoothChatService.Companion.TOAST)
+                            updateStatus(connectMsg ?: "Conectando Bluetooth...")
+                        }
                         STATE_NONE -> {
                             updateBtIndicator(false, null)
                             val toast = msg.data.getString(BluetoothChatService.Companion.TOAST)
@@ -118,6 +122,10 @@ class MainActivity : AppCompatActivity() {
                 MESSAGE_TOAST -> {
                     updateStatus(msg.data.getString(BluetoothChatService.Companion.TOAST) ?: "E004: Error BT")
                     updateBtIndicator(false, null)
+                }
+                MESSAGE_RETRY -> {
+                    val text = msg.data.getString(BluetoothChatService.Companion.TOAST) ?: "Reintentando..."
+                    updateStatus(text)
                 }
             }
         }

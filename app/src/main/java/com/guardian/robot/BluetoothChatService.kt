@@ -27,17 +27,22 @@ class BluetoothChatService(private val handler: Handler) {
         const val MESSAGE_WRITE = 3
         const val MESSAGE_DEVICE_NAME = 4
         const val MESSAGE_TOAST = 5
+        const val MESSAGE_RETRY = 6
 
         const val DEVICE_NAME = "device_name"
         const val TOAST = "toast"
 
         private const val CONNECT_TIMEOUT_MS = 15000L
+        private const val MAX_RETRIES = 2
+        private const val RETRY_DELAY_MS = 2000L
     }
 
     private val adapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
     private var state = STATE_NONE
     private var connectThread: ConnectThread? = null
     private var connectedThread: ConnectedThread? = null
+    private var retryCount = 0
+    private var connectingDevice: BluetoothDevice? = null
 
     init {
         state = STATE_NONE
@@ -52,12 +57,36 @@ class BluetoothChatService(private val handler: Handler) {
     }
 
     fun connect(device: BluetoothDevice) {
+        retryCount = 0
+        connectingDevice = device
+        Log.i(TAG, "E032: Iniciando conexion a ${device.name} addr=${device.address} bond=${device.bondState}")
+        doConnect()
+    }
+
+    private fun doConnect() {
         cancelConnectThread()
         cancelConnectedThread()
         adapter?.cancelDiscovery()
-        connectThread = ConnectThread(device)
+        connectThread = ConnectThread(connectingDevice!!)
         connectThread?.start()
         state = STATE_CONNECTING
+    }
+
+    private fun retryConnect() {
+        retryCount++
+        if (retryCount <= MAX_RETRIES) {
+            Log.w(TAG, "E032: Reintento $retryCount/$MAX_RETRIES en ${RETRY_DELAY_MS}ms")
+            val msg = handler.obtainMessage(MESSAGE_RETRY)
+            val bundle = android.os.Bundle()
+            bundle.putString(TOAST, "Reintentando ($retryCount/$MAX_RETRIES)")
+            msg.data = bundle
+            handler.sendMessage(msg)
+            handler.postDelayed({ doConnect() }, RETRY_DELAY_MS)
+        } else {
+            Log.e(TAG, "E031: Todos los ${MAX_RETRIES+1} intentos fallaron")
+            sendMessageToHandler("E031: No conectó tras ${MAX_RETRIES+1} intentos")
+            this@BluetoothChatService.state = STATE_NONE
+        }
     }
 
     fun connected(socket: BluetoothSocket, device: BluetoothDevice) {
@@ -65,6 +94,13 @@ class BluetoothChatService(private val handler: Handler) {
         cancelConnectedThread()
         connectedThread = ConnectedThread(socket)
         connectedThread?.start()
+
+        if (connectedThread?.outputStream == null) {
+            Log.e(TAG, "E033: outputStream es null tras conexion, reintentando")
+            socket.close()
+            retryConnect()
+            return
+        }
 
         val msg = handler.obtainMessage(MESSAGE_DEVICE_NAME)
         val bundle = android.os.Bundle()
@@ -76,6 +112,7 @@ class BluetoothChatService(private val handler: Handler) {
     }
 
     fun stop() {
+        handler.removeCallbacksAndMessages(null)
         cancelConnectThread()
         cancelConnectedThread()
         state = STATE_NONE
@@ -107,18 +144,6 @@ class BluetoothChatService(private val handler: Handler) {
         thread.write(msg)
     }
 
-    fun connectionFailed() {
-        Log.e(TAG, "E021: Conexión BT fallida con dispositivo")
-        sendMessageToHandler("E021: Conexión fallida")
-        state = STATE_NONE
-    }
-
-    fun connectionLost() {
-        Log.e(TAG, "E025: Conexión BT perdida")
-        sendMessageToHandler("E025: Conexión perdida")
-        state = STATE_NONE
-    }
-
     private fun sendMessageToHandler(text: String) {
         val msg = handler.obtainMessage(MESSAGE_TOAST)
         val bundle = android.os.Bundle()
@@ -139,24 +164,30 @@ class BluetoothChatService(private val handler: Handler) {
 
     private inner class ConnectThread(private val device: BluetoothDevice) : Thread() {
         private var socket: BluetoothSocket? = null
+        private var socketMethod = ""
 
         init {
+            tryCreateSocket()
+        }
+
+        private fun tryCreateSocket() {
             try {
                 socket = device.createRfcommSocketToServiceRecord(BT_UUID)
+                socketMethod = "createRfcommSocketToServiceRecord"
+                Log.i(TAG, "E032: Socket creado via $socketMethod")
+                return
             } catch (e: SecurityException) {
                 Log.e(TAG, "E003: Permiso denegado al crear socket", e)
                 sendMessageToHandler("E003: Permiso BT denegado")
+                return
             } catch (e: IOException) {
-                Log.w(TAG, "createRfcommSocketToServiceRecord falló, probando reflection", e)
-                tryReflectionSocket()
+                Log.w(TAG, "E032: $socketMethod falló: ${e.message}", e)
             }
-        }
-
-        private fun tryReflectionSocket() {
             try {
                 val method = device.javaClass.getMethod("createInsecureRfcommSocket", Int::class.java)
                 socket = method.invoke(device, 1) as BluetoothSocket
-                Log.w(TAG, "Reflection createInsecureRfcommSocket(1) exitoso")
+                socketMethod = "reflection createInsecureRfcommSocket(1)"
+                Log.w(TAG, "E032: Socket creado via $socketMethod")
             } catch (e: Exception) {
                 Log.e(TAG, "E020: Todos los métodos de socket fallaron", e)
                 sendMessageToHandler("E020: Socket no creado")
@@ -167,12 +198,13 @@ class BluetoothChatService(private val handler: Handler) {
             name = "ConnectThread"
 
             if (socket == null) {
-                Log.e(TAG, "E020: socket es null, abortando")
-                connectionFailed()
+                Log.e(TAG, "E020: socket es null, abortando intento")
+                this@BluetoothChatService.retryConnect()
                 return
             }
 
             val startMs = System.currentTimeMillis()
+            Log.i(TAG, "E032: Iniciando connect() via $socketMethod")
 
             val timeoutThread = Thread {
                 try {
@@ -180,9 +212,9 @@ class BluetoothChatService(private val handler: Handler) {
                 } catch (_: InterruptedException) {
                     return@Thread
                 }
-            synchronized(this@ConnectThread) {
-                if (this@BluetoothChatService.getState() == STATE_CONNECTING) {
-                        Log.e(TAG, "E030: Timeout de conexión (${CONNECT_TIMEOUT_MS}ms)")
+                synchronized(this@ConnectThread) {
+                    if (this@BluetoothChatService.getState() == STATE_CONNECTING) {
+                        Log.e(TAG, "E030: Timeout de ${CONNECT_TIMEOUT_MS}ms alcanzado")
                         try {
                             socket?.close()
                         } catch (_: IOException) {}
@@ -194,22 +226,21 @@ class BluetoothChatService(private val handler: Handler) {
             try {
                 socket?.connect()
                 timeoutThread.interrupt()
+                Log.i(TAG, "E032: connect() exitoso tras ${System.currentTimeMillis() - startMs}ms")
             } catch (e: IOException) {
                 timeoutThread.interrupt()
                 val elapsed = System.currentTimeMillis() - startMs
+                Log.e(TAG, "E032: connect() falló a los ${elapsed}ms: ${e.message}", e)
                 if (elapsed >= CONNECT_TIMEOUT_MS) {
-                    Log.e(TAG, "E030: Timeout de conexión tras ${elapsed}ms", e)
-                    sendMessageToHandler("E030: Tiempo agotado (${CONNECT_TIMEOUT_MS / 1000}s)")
                     this@BluetoothChatService.state = STATE_NONE
-                } else {
-                    Log.e(TAG, "E021: connect() falló a los ${elapsed}ms", e)
-                    connectionFailed()
+                    sendMessageToHandler("E030: Tiempo agotado (${CONNECT_TIMEOUT_MS / 1000}s)")
                 }
                 try {
                     socket?.close()
                 } catch (e2: IOException) {
                     Log.e(TAG, "E022: Error cerrando socket", e2)
                 }
+                this@BluetoothChatService.retryConnect()
                 return
             }
 
@@ -231,15 +262,10 @@ class BluetoothChatService(private val handler: Handler) {
 
     private inner class ConnectedThread(private val socket: BluetoothSocket) : Thread() {
         private val inputStream: InputStream? = socket.inputStream
-        private val outputStream: OutputStream? = socket.outputStream
+        val outputStream: OutputStream? = socket.outputStream
 
         init {
-            if (inputStream == null) {
-                Log.e(TAG, "E026: InputStream es null al crear ConnectedThread")
-            }
-            if (outputStream == null) {
-                Log.e(TAG, "E026: OutputStream es null al crear ConnectedThread")
-            }
+            Log.i(TAG, "E033: ConnectedThread creado inputStream=${inputStream != null} outputStream=${outputStream != null}")
         }
 
         override fun run() {
@@ -251,13 +277,14 @@ class BluetoothChatService(private val handler: Handler) {
                 try {
                     val bytes = inputStream?.read(buffer) ?: -1
                     if (bytes == -1) {
-                        connectionLost()
+                        Log.w(TAG, "E025: read() retornó -1, conexión perdida")
+                        this@BluetoothChatService.connectionLost()
                         break
                     }
                     handler.obtainMessage(MESSAGE_READ, bytes, -1, buffer).sendToTarget()
                 } catch (e: IOException) {
-                    Log.e(TAG, "E025: IOException en read(), conexión perdida", e)
-                    connectionLost()
+                    Log.e(TAG, "E025: IOException en read(): ${e.message}", e)
+                    this@BluetoothChatService.connectionLost()
                     break
                 }
             }
@@ -269,7 +296,6 @@ class BluetoothChatService(private val handler: Handler) {
                 outputStream?.flush()
             } catch (e: IOException) {
                 Log.e(TAG, "E023: Error escribiendo Char por BT", e)
-                sendMessageToHandler("E023: Error envío BT")
             }
         }
 
@@ -279,7 +305,6 @@ class BluetoothChatService(private val handler: Handler) {
                 outputStream?.flush()
             } catch (e: IOException) {
                 Log.e(TAG, "E024: Error escribiendo String por BT", e)
-                sendMessageToHandler("E024: Error envío BT")
             }
         }
 
