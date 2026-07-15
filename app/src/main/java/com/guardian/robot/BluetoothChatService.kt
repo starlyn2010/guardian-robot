@@ -197,6 +197,29 @@ class BluetoothChatService(private val handler: Handler) {
             }
         }
 
+        private fun tryConnectWithTimeout(s: BluetoothSocket, method: String, timeoutMs: Long): Boolean {
+            val t = Thread {
+                try { Thread.sleep(timeoutMs) } catch (_: InterruptedException) { return@Thread }
+                synchronized(this@ConnectThread) {
+                    if (this@BluetoothChatService.getState() == STATE_CONNECTING) {
+                        Log.e(TAG, "E030: Timeout ${timeoutMs}ms ($method)")
+                        try { s.close() } catch (_: IOException) {}
+                    }
+                }
+            }
+            t.start()
+            return try {
+                s.connect()
+                t.interrupt()
+                Log.i(TAG, "E032: connect() exitoso ($method)")
+                true
+            } catch (e: IOException) {
+                t.interrupt()
+                Log.e(TAG, "E032: connect() falló ($method): ${e.message}", e)
+                false
+            }
+        }
+
         override fun run() {
             name = "ConnectThread"
 
@@ -209,49 +232,41 @@ class BluetoothChatService(private val handler: Handler) {
             val startMs = System.currentTimeMillis()
             Log.i(TAG, "E032: Iniciando connect() via $socketMethod")
 
-            val timeoutThread = Thread {
-                try {
-                    Thread.sleep(CONNECT_TIMEOUT_MS)
-                } catch (_: InterruptedException) {
-                    return@Thread
-                }
-                synchronized(this@ConnectThread) {
-                    if (this@BluetoothChatService.getState() == STATE_CONNECTING) {
-                        Log.e(TAG, "E030: Timeout de ${CONNECT_TIMEOUT_MS}ms alcanzado")
-                        try {
-                            socket?.close()
-                        } catch (_: IOException) {}
-                    }
-                }
-            }
-            timeoutThread.start()
-
-            try {
-                socket?.connect()
-                timeoutThread.interrupt()
-                Log.i(TAG, "E032: connect() exitoso tras ${System.currentTimeMillis() - startMs}ms")
-            } catch (e: IOException) {
-                timeoutThread.interrupt()
-                val elapsed = System.currentTimeMillis() - startMs
-                Log.e(TAG, "E032: connect() falló a los ${elapsed}ms: ${e.message}", e)
-                if (elapsed >= CONNECT_TIMEOUT_MS) {
-                    this@BluetoothChatService.state = STATE_NONE
-                    sendMessageToHandler("E030: Tiempo agotado (${CONNECT_TIMEOUT_MS / 1000}s)")
-                }
-                try {
-                    socket?.close()
-                } catch (e2: IOException) {
-                    Log.e(TAG, "E022: Error cerrando socket", e2)
-                }
-                this@BluetoothChatService.retryConnect()
+            if (tryConnectWithTimeout(socket!!, socketMethod, CONNECT_TIMEOUT_MS)) {
+                synchronized(this@BluetoothChatService) { connectThread = null }
+                connected(socket!!, device)
                 return
             }
 
-            synchronized(this@BluetoothChatService) {
-                connectThread = null
+            try { socket?.close() } catch (_: IOException) {}
+
+            if (!socketMethod.contains("Insecure")) {
+                Log.w(TAG, "E032: Intentando fallback con socket inseguro")
+                try {
+                    val m = device.javaClass.getMethod("createInsecureRfcommSocket", Int::class.java)
+                    socket = m.invoke(device, 1) as BluetoothSocket
+                    socketMethod = "insecure (fallback)"
+                    Log.w(TAG, "E032: Socket inseguro creado")
+                    val remaining = CONNECT_TIMEOUT_MS - (System.currentTimeMillis() - startMs)
+                    if (remaining > 0 && tryConnectWithTimeout(socket!!, socketMethod, remaining)) {
+                        synchronized(this@BluetoothChatService) { connectThread = null }
+                        connected(socket!!, device)
+                        return
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "E020: Fallback inseguro falló: ${e.message}", e)
+                }
             }
 
-            connected(socket!!, device)
+            val elapsed = System.currentTimeMillis() - startMs
+            if (elapsed >= CONNECT_TIMEOUT_MS) {
+                this@BluetoothChatService.state = STATE_NONE
+                sendMessageToHandler("E030: Tiempo agotado (${CONNECT_TIMEOUT_MS / 1000}s)")
+            }
+            try { socket?.close() } catch (e2: IOException) {
+                Log.e(TAG, "E022: Error cerrando socket", e2)
+            }
+            this@BluetoothChatService.retryConnect()
         }
 
         fun cancel() {
