@@ -138,27 +138,40 @@ class BluetoothChatService(private val handler: Handler) {
         private var socket: BluetoothSocket? = null
 
         init {
+            tryCreateSocket()
+        }
+
+        private fun tryCreateSocket() {
             try {
-                socket = device.createRfcommSocketToServiceRecord(BT_UUID)
+                socket = device.createInsecureRfcommSocketToServiceRecord(BT_UUID)
+                Log.i(TAG, "Socket creado con createInsecureRfcommSocketToServiceRecord")
+                return
             } catch (e: SecurityException) {
                 Log.e(TAG, "E003: Permiso BT denegado al crear socket", e)
                 sendMessageToHandler("E003: Permiso BT denegado")
+                return
             } catch (e: IOException) {
-                Log.e(TAG, "E020: createRfcommSocketToServiceRecord falló", e)
-                tryFallbackSocket()
-            } catch (e: NullPointerException) {
-                Log.e(TAG, "E020: device nulo en createSocket", e)
-                sendMessageToHandler("E020: Dispositivo inválido")
+                Log.w(TAG, "Insecure falló, probando método seguro", e)
+            }
+            try {
+                socket = device.createRfcommSocketToServiceRecord(BT_UUID)
+                Log.i(TAG, "Socket creado con createRfcommSocketToServiceRecord (seguro)")
+            } catch (e: SecurityException) {
+                Log.e(TAG, "E003: Permiso BT denegado al crear socket seguro", e)
+                sendMessageToHandler("E003: Permiso BT denegado")
+            } catch (e: IOException) {
+                Log.w(TAG, "Seguro también falló, probando reflection", e)
+                tryReflectionSocket()
             }
         }
 
-        private fun tryFallbackSocket() {
+        private fun tryReflectionSocket() {
             try {
-                val method = device.javaClass.getMethod("createRfcommSocket", Int::class.java)
+                val method = device.javaClass.getMethod("createInsecureRfcommSocket", Int::class.java)
                 socket = method.invoke(device, 1) as BluetoothSocket
-                Log.w(TAG, "E020: Fallback createRfcommSocket(1) exitoso")
+                Log.w(TAG, "Reflection createInsecureRfcommSocket(1) exitoso")
             } catch (e: Exception) {
-                Log.e(TAG, "E020: Ambos métodos de socket fallaron", e)
+                Log.e(TAG, "E020: Todos los métodos de socket fallaron", e)
                 sendMessageToHandler("E020: Socket no creado")
             }
         }
