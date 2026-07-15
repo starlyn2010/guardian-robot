@@ -31,7 +31,7 @@ class BluetoothChatService(private val handler: Handler) {
         const val DEVICE_NAME = "device_name"
         const val TOAST = "toast"
 
-        private const val CONNECT_TIMEOUT_MS = 10000L
+        private const val CONNECT_TIMEOUT_MS = 15000L
     }
 
     private val adapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
