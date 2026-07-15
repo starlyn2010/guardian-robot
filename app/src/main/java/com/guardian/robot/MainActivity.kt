@@ -83,8 +83,8 @@ class MainActivity : AppCompatActivity() {
     private var isScanning = false
 
     companion object {
-        private val INTRUDER_CLASSES = setOf(1, 16, 17, 18, 19, 20, 21, 22, 23, 24)
-        private const val CONF_THRESHOLD = 0.6f
+private val INTRUDER_CLASSES = setOf(0, 1, 16, 17, 18, 19, 20, 21, 22, 23, 24)
+    private const val CONF_THRESHOLD = 0.3f
         private const val YELLOW_RATIO = 0.05f
         private const val RED_RATIO = 0.18f
         private const val FRAME_W = 640
@@ -341,7 +341,7 @@ class MainActivity : AppCompatActivity() {
         val color = if (connected) ContextCompat.getColor(this, R.color.zone_green)
                     else ContextCompat.getColor(this, R.color.zone_red)
         binding.btIndicator.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
-        binding.tvBtStatus.text = if (connected) "BT: $deviceName" else "Desconectado"
+        binding.tvBtStatus.text = if (connected) "BT: ${deviceName ?: "HC-06"}" else "Desconectado"
         binding.tvBtStatus.setTextColor(
             if (connected) ContextCompat.getColor(this, R.color.zone_green)
             else ContextCompat.getColor(this, R.color.text_muted)
