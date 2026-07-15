@@ -30,6 +30,8 @@ class BluetoothChatService(private val handler: Handler) {
 
         const val DEVICE_NAME = "device_name"
         const val TOAST = "toast"
+
+        private const val CONNECT_TIMEOUT_MS = 10000L
     }
 
     private val adapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
@@ -52,6 +54,7 @@ class BluetoothChatService(private val handler: Handler) {
     fun connect(device: BluetoothDevice) {
         cancelConnectThread()
         cancelConnectedThread()
+        adapter?.cancelDiscovery()
         connectThread = ConnectThread(device)
         connectThread?.start()
         state = STATE_CONNECTING
@@ -138,29 +141,13 @@ class BluetoothChatService(private val handler: Handler) {
         private var socket: BluetoothSocket? = null
 
         init {
-            tryCreateSocket()
-        }
-
-        private fun tryCreateSocket() {
-            try {
-                socket = device.createInsecureRfcommSocketToServiceRecord(BT_UUID)
-                Log.i(TAG, "Socket creado con createInsecureRfcommSocketToServiceRecord")
-                return
-            } catch (e: SecurityException) {
-                Log.e(TAG, "E003: Permiso BT denegado al crear socket", e)
-                sendMessageToHandler("E003: Permiso BT denegado")
-                return
-            } catch (e: IOException) {
-                Log.w(TAG, "Insecure falló, probando método seguro", e)
-            }
             try {
                 socket = device.createRfcommSocketToServiceRecord(BT_UUID)
-                Log.i(TAG, "Socket creado con createRfcommSocketToServiceRecord (seguro)")
             } catch (e: SecurityException) {
-                Log.e(TAG, "E003: Permiso BT denegado al crear socket seguro", e)
+                Log.e(TAG, "E003: Permiso denegado al crear socket", e)
                 sendMessageToHandler("E003: Permiso BT denegado")
             } catch (e: IOException) {
-                Log.w(TAG, "Seguro también falló, probando reflection", e)
+                Log.w(TAG, "createRfcommSocketToServiceRecord falló, probando reflection", e)
                 tryReflectionSocket()
             }
         }
@@ -179,25 +166,49 @@ class BluetoothChatService(private val handler: Handler) {
         override fun run() {
             name = "ConnectThread"
 
-            adapter?.cancelDiscovery()
-
             if (socket == null) {
-                Log.e(TAG, "E020: socket es null antes de connect(), abortando")
+                Log.e(TAG, "E020: socket es null, abortando")
                 connectionFailed()
                 return
             }
 
+            val startMs = System.currentTimeMillis()
+
+            val timeoutThread = Thread {
+                try {
+                    Thread.sleep(CONNECT_TIMEOUT_MS)
+                } catch (_: InterruptedException) {
+                    return@Thread
+                }
+                synchronized(this@ConnectThread) {
+                    if (getState() == STATE_CONNECTING) {
+                        Log.e(TAG, "E030: Timeout de conexión (${CONNECT_TIMEOUT_MS}ms)")
+                        try {
+                            socket?.close()
+                        } catch (_: IOException) {}
+                    }
+                }
+            }
+            timeoutThread.start()
+
             try {
                 socket?.connect()
-                Log.i(TAG, "ConnectThread: socket.connect() exitoso")
+                timeoutThread.interrupt()
             } catch (e: IOException) {
-                Log.e(TAG, "E021: connect() falló: ${e.message}", e)
+                timeoutThread.interrupt()
+                val elapsed = System.currentTimeMillis() - startMs
+                if (elapsed >= CONNECT_TIMEOUT_MS) {
+                    Log.e(TAG, "E030: Timeout de conexión tras ${elapsed}ms", e)
+                    sendMessageToHandler("E030: Tiempo agotado (${CONNECT_TIMEOUT_MS / 1000}s)")
+                } else {
+                    Log.e(TAG, "E021: connect() falló a los ${elapsed}ms", e)
+                    connectionFailed()
+                }
                 try {
                     socket?.close()
                 } catch (e2: IOException) {
-                    Log.e(TAG, "E022: Error cerrando socket tras fallo", e2)
+                    Log.e(TAG, "E022: Error cerrando socket", e2)
                 }
-                connectionFailed()
                 return
             }
 
