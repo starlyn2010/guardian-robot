@@ -121,7 +121,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 MESSAGE_TOAST -> {
                     updateStatus(msg.data.getString(BluetoothChatService.Companion.TOAST) ?: "E004: Error BT")
-                    updateBtIndicator(false, null)
                 }
                 MESSAGE_RETRY -> {
                     val text = msg.data.getString(BluetoothChatService.Companion.TOAST) ?: "Reintentando..."

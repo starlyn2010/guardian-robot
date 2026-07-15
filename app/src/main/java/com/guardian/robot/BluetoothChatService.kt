@@ -67,20 +67,17 @@ class BluetoothChatService(private val handler: Handler) {
         cancelConnectThread()
         cancelConnectedThread()
         adapter?.cancelDiscovery()
+        state = STATE_CONNECTING
+        handler.obtainMessage(MESSAGE_STATE_CHANGE, STATE_CONNECTING, -1).sendToTarget()
         connectThread = ConnectThread(connectingDevice!!)
         connectThread?.start()
-        state = STATE_CONNECTING
     }
 
     private fun retryConnect() {
         retryCount++
         if (retryCount <= MAX_RETRIES) {
             Log.w(TAG, "E032: Reintento $retryCount/$MAX_RETRIES en ${RETRY_DELAY_MS}ms")
-            val msg = handler.obtainMessage(MESSAGE_RETRY)
-            val bundle = android.os.Bundle()
-            bundle.putString(TOAST, "Reintentando ($retryCount/$MAX_RETRIES)")
-            msg.data = bundle
-            handler.sendMessage(msg)
+            handler.obtainMessage(MESSAGE_STATE_CHANGE, STATE_CONNECTING, -1).sendToTarget()
             handler.postDelayed({ doConnect() }, RETRY_DELAY_MS)
         } else {
             Log.e(TAG, "E031: Todos los ${MAX_RETRIES+1} intentos fallaron")
