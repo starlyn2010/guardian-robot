@@ -144,6 +144,12 @@ class BluetoothChatService(private val handler: Handler) {
         thread.write(msg)
     }
 
+    fun connectionLost() {
+        Log.e(TAG, "E025: Conexión BT perdida con ${connectingDevice?.name}")
+        sendMessageToHandler("E025: Conexión perdida")
+        this@BluetoothChatService.state = STATE_NONE
+    }
+
     private fun sendMessageToHandler(text: String) {
         val msg = handler.obtainMessage(MESSAGE_TOAST)
         val bundle = android.os.Bundle()
