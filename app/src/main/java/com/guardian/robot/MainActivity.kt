@@ -67,6 +67,8 @@ class MainActivity : AppCompatActivity() {
     private var cameraActive = false
     private var lastSent = 3
     private var lastZone = DetectionOverlayView.ZONE_GREEN
+    private var stableZoneCount = 0
+    private var pendingZone = DetectionOverlayView.ZONE_GREEN
 
     private val intrusionLog = mutableListOf<IntrusionEvent>()
     private lateinit var intrusionAdapter: IntrusionAdapter
@@ -83,10 +85,13 @@ class MainActivity : AppCompatActivity() {
     private var isScanning = false
 
     companion object {
-private val INTRUDER_CLASSES = setOf(0, 1, 16, 17, 18, 19, 20, 21, 22, 23, 24)
-    private const val CONF_THRESHOLD = 0.3f
-        private const val YELLOW_RATIO = 0.05f
-        private const val RED_RATIO = 0.18f
+        private val INTRUDER_CLASSES = setOf(0, 1, 16, 17, 18, 19, 20, 21, 22, 23, 24)
+        private const val CONF_THRESHOLD = 0.3f
+        private const val YELLOW_RATIO_ENTER = 0.08f
+        private const val YELLOW_RATIO_EXIT = 0.03f
+        private const val RED_RATIO_ENTER = 0.20f
+        private const val RED_RATIO_EXIT = 0.15f
+        private const val STABLE_FRAMES = 3
         private const val FRAME_W = 640
         private const val FRAME_H = 480
         private const val FRAME_AREA = FRAME_W * FRAME_H
@@ -430,35 +435,55 @@ private val INTRUDER_CLASSES = setOf(0, 1, 16, 17, 18, 19, 20, 21, 22, 23, 24)
                     }
                 }
 
-                val zone = when {
-                    maxRatio == 0f -> DetectionOverlayView.ZONE_GREEN
-                    maxRatio >= RED_RATIO -> DetectionOverlayView.ZONE_RED
-                    maxRatio >= YELLOW_RATIO -> DetectionOverlayView.ZONE_YELLOW
+                val zone = when (lastZone) {
+                    DetectionOverlayView.ZONE_GREEN -> when {
+                        maxRatio >= RED_RATIO_ENTER -> DetectionOverlayView.ZONE_RED
+                        maxRatio >= YELLOW_RATIO_ENTER -> DetectionOverlayView.ZONE_YELLOW
+                        else -> DetectionOverlayView.ZONE_GREEN
+                    }
+                    DetectionOverlayView.ZONE_YELLOW -> when {
+                        maxRatio >= RED_RATIO_ENTER -> DetectionOverlayView.ZONE_RED
+                        maxRatio < YELLOW_RATIO_EXIT -> DetectionOverlayView.ZONE_GREEN
+                        else -> DetectionOverlayView.ZONE_YELLOW
+                    }
+                    DetectionOverlayView.ZONE_RED -> when {
+                        maxRatio < RED_RATIO_EXIT -> DetectionOverlayView.ZONE_YELLOW
+                        else -> DetectionOverlayView.ZONE_RED
+                    }
                     else -> DetectionOverlayView.ZONE_GREEN
                 }
 
-                val cmd = when (zone) {
+                val stableZone = if (zone == pendingZone) {
+                    stableZoneCount++
+                    if (stableZoneCount >= STABLE_FRAMES) zone else lastZone
+                } else {
+                    pendingZone = zone
+                    stableZoneCount = 1
+                    lastZone
+                }
+
+                val cmd = when (stableZone) {
                     DetectionOverlayView.ZONE_RED -> 1    // Peligro
                     DetectionOverlayView.ZONE_YELLOW -> 2  // Precaución
                     else -> 3                              // Seguro
                 }
 
                 mainHandler.post {
-                    binding.detectionOverlay.setDetections(detections, FRAME_W, FRAME_H, zone)
+                    binding.detectionOverlay.setDetections(detections, FRAME_W, FRAME_H, stableZone)
                 }
 
-                if (zone != lastZone) {
-                    lastZone = zone
-                    setZoneIndicator(zone)
+                if (stableZone != lastZone) {
+                    lastZone = stableZone
+                    setZoneIndicator(stableZone)
                     sendBT(cmd)
-                    if (zone == DetectionOverlayView.ZONE_RED) {
+                    if (stableZone == DetectionOverlayView.ZONE_RED) {
                         speak("Intruso detectado")
                         addIntrusionEvent(topClass, topScore, maxRatio)
                     }
                 }
 
                 val confPct = (topScore * 100).toInt()
-                val zoneName = when (zone) {
+                val zoneName = when (stableZone) {
                     DetectionOverlayView.ZONE_GREEN -> "VERDE"
                     DetectionOverlayView.ZONE_YELLOW -> "AMARILLO"
                     else -> "ROJO"
