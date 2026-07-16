@@ -69,8 +69,6 @@ class MainActivity : AppCompatActivity() {
     private var lastZone = DetectionOverlayView.ZONE_GREEN
     private var stableZoneCount = 0
     private var pendingZone = DetectionOverlayView.ZONE_GREEN
-    private var lastSentTime = 0L
-    private var zoneEntryTime = 0L
 
     private val intrusionLog = mutableListOf<IntrusionEvent>()
     private lateinit var intrusionAdapter: IntrusionAdapter
@@ -100,9 +98,6 @@ class MainActivity : AppCompatActivity() {
         private const val TAG = "Guardian"
         private const val PERM_REQ_CODE = 100
         private const val MAX_LOG_SIZE = 50
-        private const val BT_THROTTLE_MS = 300L
-        private const val BT_HEARTBEAT_MS = 500L
-        private const val HOLD_MS = 1000L
     }
 
     private val btHandler = object : Handler(Looper.getMainLooper()) {
@@ -458,7 +453,7 @@ class MainActivity : AppCompatActivity() {
                     else -> DetectionOverlayView.ZONE_GREEN
                 }
 
-                val rawZone = if (zone == pendingZone) {
+                val stableZone = if (zone == pendingZone) {
                     stableZoneCount++
                     if (stableZoneCount >= STABLE_FRAMES) zone else lastZone
                 } else {
@@ -467,33 +462,24 @@ class MainActivity : AppCompatActivity() {
                     lastZone
                 }
 
-                val now = System.currentTimeMillis()
-                val canDeescalate = rawZone >= lastZone || now - zoneEntryTime >= HOLD_MS
-                val stableZone = if (canDeescalate) rawZone else lastZone
-
                 val cmd = when (stableZone) {
-                    DetectionOverlayView.ZONE_RED -> 1
-                    DetectionOverlayView.ZONE_YELLOW -> 2
-                    else -> 3
+                    DetectionOverlayView.ZONE_RED -> 1    // Peligro
+                    DetectionOverlayView.ZONE_YELLOW -> 2  // Precaución
+                    else -> 3                              // Seguro
+                }
+
+                mainHandler.post {
+                    binding.detectionOverlay.setDetections(detections, FRAME_W, FRAME_H, stableZone)
                 }
 
                 if (stableZone != lastZone) {
                     lastZone = stableZone
-                    zoneEntryTime = now
                     setZoneIndicator(stableZone)
                     sendBT(cmd)
                     if (stableZone == DetectionOverlayView.ZONE_RED) {
                         speak("Intruso detectado")
                         addIntrusionEvent(topClass, topScore, maxRatio)
                     }
-                } else {
-                    if (now - lastSentTime >= BT_HEARTBEAT_MS) {
-                        sendBT(cmd)
-                    }
-                }
-
-                mainHandler.post {
-                    binding.detectionOverlay.setDetections(detections, FRAME_W, FRAME_H, stableZone)
                 }
 
                 val confPct = (topScore * 100).toInt()
@@ -595,9 +581,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendBT(n: Int) {
-        val now = System.currentTimeMillis()
-        if (now - lastSentTime < BT_THROTTLE_MS) return
-        lastSentTime = now
         if (btService == null) {
             Log.e(TAG, "E011: btService es null, no se puede enviar comando $n")
             updateStatus("E011: Sin conexión BT para enviar")
@@ -628,8 +611,6 @@ class MainActivity : AppCompatActivity() {
         cameraActive = false
         lastSent = 3
         lastZone = DetectionOverlayView.ZONE_GREEN
-        lastSentTime = 0L
-        zoneEntryTime = 0L
         binding.btnStart.visibility = View.VISIBLE
         binding.btnStop.visibility = View.GONE
         binding.detectionOverlay.clearDetections()
